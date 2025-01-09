@@ -26,7 +26,7 @@ jobs:
   # Checks for existence of alive branch; if non-existent creates it
   check_alive_and_permissions:
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Check alive branch and permissions
     permissions:
       contents: write
