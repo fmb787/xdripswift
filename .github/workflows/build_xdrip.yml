@@ -87,7 +87,7 @@ jobs:
   # Performs keepalive to avoid stale fork
   check_latest_from_upstream:
     needs: [validate, check_alive_and_permissions]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Check upstream and keep alive
     outputs: 
       NEW_COMMITS: ${{ steps.sync.outputs.has_new_commits }}
