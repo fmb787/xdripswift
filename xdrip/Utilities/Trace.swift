@@ -64,7 +64,7 @@ fileprivate var traceFileName:URL?
 /// - category is the same as used for creating the log (see class ConstantsLog), it's repeated here to use in NSLog
 /// - args : optional list of parameters that will be used. MAXIMUM 10 !
 ///
-/// Example 
+/// Example
 func trace(_ message: StaticString, log:OSLog, category: String, type: OSLogType, _ args: CVarArg...) {
 
     // initialize traceFileName if needed
@@ -210,10 +210,16 @@ func trace(_ message: StaticString, log:OSLog, category: String, type: OSLogType
    
     
     // check if tracefile has reached limit size and if yes rotate the files
-    if traceFileName.fileSize > ConstantsTrace.maximumFileSizeInMB * 1024 * 1024 {
-        
-        rotateTraceFiles()
-        
+    // NOTE: Changed implementation after TestFlight crash report showing "URL.fileSize.getter + 20".
+    // The old version used the extension fileSize which called FileManager.attributesOfItem(atPath:) - this could
+    // crash if the file was being rotated or removed concurrently (race condition during trace log writes).
+    // Using URL.resourceValues(forKeys:) makes the lookup safe and avoids trapping on transient I/O states.
+    if let resourceValues = try? traceFileName.resourceValues(forKeys: [.fileSizeKey]),
+       let fileSizeInt = resourceValues.fileSize {
+        let maxBytes = UInt64(ConstantsTrace.maximumFileSizeInMB) * 1024 * 1024
+        if UInt64(fileSizeInt) > maxBytes {
+            rotateTraceFiles()
+        }
     }
     
 }
@@ -344,6 +350,7 @@ class Trace {
         traceInfo.appendStringAndNewLine("    Measurement unit: " + (UserDefaults.standard.bloodGlucoseUnitIsMgDl ? Texts_Common.mgdl : Texts_Common.mmol))
         
         if UserDefaults.standard.isMaster {
+            traceInfo.appendStringAndNewLine("    Upload master values to Nightscout: " + UserDefaults.standard.masterUploadDataToNightscout.description)
             
             if let cgmTransmitterTypeAsString = UserDefaults.standard.cgmTransmitterTypeAsString {
                 traceInfo.appendStringAndNewLine("    Transmitter type: " + cgmTransmitterTypeAsString)
@@ -354,11 +361,25 @@ class Trace {
             traceInfo.appendStringAndNewLine("    Keep-alive type: " + UserDefaults.standard.followerBackgroundKeepAliveType.description)
             traceInfo.appendStringAndNewLine("    Patient name: " + (UserDefaults.standard.followerPatientName?.description ?? "nil"))
             
-            // if follower mode, what is the data source selected
-            if UserDefaults.standard.followerDataSourceType == .libreLinkUp {
+            if UserDefaults.standard.followerDataSourceType == .nightscout {
+                traceInfo.appendStringAndNewLine("    URL: " + ((UserDefaults.standard.nightscoutUrl?.description ?? "") != "" ? "present" : "missing"))
+                traceInfo.appendStringAndNewLine("    Upload follower values to Nightscout: " + UserDefaults.standard.followerUploadDataToNightscout.description)
+            }
+            
+            if UserDefaults.standard.followerDataSourceType == .libreLinkUp || UserDefaults.standard.followerDataSourceType == .libreLinkUpRussia {
                 traceInfo.appendStringAndNewLine("    Username: " + ((UserDefaults.standard.libreLinkUpEmail?.description ?? "") != "" ? "present" : "missing"))
                 traceInfo.appendStringAndNewLine("    Password: " + ((UserDefaults.standard.libreLinkUpPassword?.description ?? "") != "" ? "present" : "missing"))
-                traceInfo.appendStringAndNewLine("    Upload to Nightscout: " + UserDefaults.standard.followerUploadDataToNightscout.description)
+                traceInfo.appendStringAndNewLine("    Region: " + (UserDefaults.standard.libreLinkUpRegion?.description ?? "nil"))
+                traceInfo.appendStringAndNewLine("    Country: " + (UserDefaults.standard.libreLinkUpCountry?.description ?? "nil"))
+                traceInfo.appendStringAndNewLine("    Is 15 day sensor: " + UserDefaults.standard.libreLinkUpIs15DaySensor.description)
+                traceInfo.appendStringAndNewLine("    Upload LLU follower values to Nightscout: " + UserDefaults.standard.followerUploadDataToNightscout.description)
+            }
+            
+            if UserDefaults.standard.followerDataSourceType == .dexcomShare {
+                traceInfo.appendStringAndNewLine("    Username: " + ((UserDefaults.standard.dexcomShareAccountName?.description ?? "") != "" ? "present" : "missing"))
+                traceInfo.appendStringAndNewLine("    Password: " + ((UserDefaults.standard.dexcomSharePassword?.description ?? "") != "" ? "present" : "missing"))
+                traceInfo.appendStringAndNewLine("    Region: " + UserDefaults.standard.dexcomShareRegion.description)
+                traceInfo.appendStringAndNewLine("    Upload Share follower values to Nightscout: " + UserDefaults.standard.followerUploadDataToNightscout.description)
             }
         }
         
@@ -406,8 +427,8 @@ class Trace {
             traceInfo.appendStringAndNewLine("    Account name: " + ((UserDefaults.standard.dexcomShareAccountName?.description ?? "") != "" ? "present" : "missing"))
             traceInfo.appendStringAndNewLine("    Password: " + ((UserDefaults.standard.dexcomSharePassword?.description ?? "") != "" ? "present" : "missing"))
             traceInfo.appendStringAndNewLine("    Use US servers: " + UserDefaults.standard.useUSDexcomShareurl .description)
-            traceInfo.appendStringAndNewLine("    Receiver serial number: " + (UserDefaults.standard.dexcomShareSerialNumber?.description ?? "nil"))
-            traceInfo.appendStringAndNewLine("    Use upload schedule: " + UserDefaults.standard.dexcomShareUseSchedule.description)
+            traceInfo.appendStringAndNewLine("    Receiver serial number: " + (UserDefaults.standard.dexcomShareUploadSerialNumber?.description ?? "nil"))
+            traceInfo.appendStringAndNewLine("    Use upload schedule: " + UserDefaults.standard.dexcomShareUploadUseSchedule.description)
         }
                                              
         traceInfo.appendStringAndNewLine("\nApple Health settings:")
@@ -702,10 +723,19 @@ class Trace {
                 let alertEntries = alertEntriesAccessor.getAllEntries(forAlertKind: alertKind, alertTypesAccessor: alertTypesAccessor)
                 
                 for alertEntry in alertEntries {
-                    traceInfo.appendStringAndNewLine("        -> start: " + alertEntry.start.convertMinutesToTimeAsString() + " / value: " +  alertEntry.value.description + " / alarm type: " + alertEntry.alertType.description)
-                    
+                    if alertEntry.isDisabled {
+                        traceInfo.appendStringAndNewLine("        -> disabled")
+                    } else {
+                        switch alertKind {
+                        case .fastdrop:
+                            traceInfo.appendStringAndNewLine("        -> start: " + alertEntry.start.convertMinutesToTimeAsString() + " / value: " +  alertEntry.value.description + " / when < " +  alertEntry.triggerValue.description + " / alarm type: " + alertEntry.alertType.description)
+                        case .fastrise:
+                            traceInfo.appendStringAndNewLine("        -> start: " + alertEntry.start.convertMinutesToTimeAsString() + " / value: " +  alertEntry.value.description + " / when > " +  alertEntry.triggerValue.description + " / alarm type: " + alertEntry.alertType.description)
+                        default:
+                            traceInfo.appendStringAndNewLine("        -> start: " + alertEntry.start.convertMinutesToTimeAsString() + " / value: " +  alertEntry.value.description + " / alarm type: " + alertEntry.alertType.description)
+                        }
+                    }
                 }
-                
             }
             
             traceInfo.appendStringAndNewLine(paragraphSeperator)
