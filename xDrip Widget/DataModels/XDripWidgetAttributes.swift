@@ -94,6 +94,16 @@ struct XDripWidgetAttributes: ActivityAttributes {
             bgReadingDates.first
         }
 
+        /// Set to true only when drawing (see `ActivityViewContext.displayState`), if iOS reports the Live Activity as stale.
+        /// Optional so that activities created before this property existed still decode.
+        var isMarkedStale: Bool? = nil
+
+        /// The date after which iOS must consider this Live Activity out of date: the moment the latest reading becomes too old to show.
+        /// Passed as `staleDate` when starting/updating the activity, so that iOS redraws it at that moment even if the app is suspended and cannot send an update.
+        var staleDate: Date? {
+            bgReadingDate?.addingTimeInterval(ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes)
+        }
+
         init(bgReadingValues: [Double], bgReadingDates: [Date], isMgDl: Bool, slopeOrdinal: Int, deltaValueInUserUnit: Double?, urgentLowLimitInMgDl: Double, lowLimitInMgDl: Double, highLimitInMgDl: Double, urgentHighLimitInMgDl: Double, liveActivityType: LiveActivityType, carPlayLiveActivityType: CarPlayLiveActivityType? = nil, dataSourceDescription: String? = "", followerPatientName: String? = nil, sensorNoiseStateRawValue: Int? = nil, aidStatus: AIDStatus?, therapyMetrics: TherapyMetricsSnapshot? = nil) {
             let readings = Array(zip(bgReadingValues, bgReadingDates))
             self.bgReadingFloats = readings.map { Float16($0.0) }
@@ -145,7 +155,7 @@ struct XDripWidgetAttributes: ActivityAttributes {
         /// returns blood glucose value as a string in the user-defined measurement unit. Will check and display also high, low and error texts as required.
         /// - Returns: a String with the formatted value/unit or error text
         func bgValueStringInUserChosenUnit() -> String {
-            if let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes), let bgValueInMgDl = bgValueInMgDl {
+            if isMarkedStale != true, let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes), let bgValueInMgDl = bgValueInMgDl {
                 var returnValue: String
                 
                 if bgValueInMgDl >= 400 {
@@ -215,7 +225,7 @@ struct XDripWidgetAttributes: ActivityAttributes {
         /// convert the optional delta change int (in mg/dL) to a formatted change value in the user chosen unit making sure all zero values are shown as a positive change to follow Nightscout convention
         /// - Returns: a string holding the formatted delta change value (i.e. +0.4 or -6)
         func deltaChangeStringInUserChosenUnit() -> String {
-            if let deltaValueInUserUnit = deltaValueInUserUnit, let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes) {
+            if isMarkedStale != true, let deltaValueInUserUnit = deltaValueInUserUnit, let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes) {
                 let deltaSign: String = deltaValueInUserUnit > 0 ? "+" : ""
                 let deltaValueAsString = isMgDl ? deltaValueInUserUnit.mgDlToMmolAndToString(mgDl: isMgDl) : deltaValueInUserUnit.mmolToString()
                 
@@ -230,7 +240,7 @@ struct XDripWidgetAttributes: ActivityAttributes {
         ///  returns a string holding the trend arrow
         /// - Returns: trend arrow string (i.e.  "↑")
         func trendArrow() -> String {
-            if let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes) {
+            if isMarkedStale != true, let bgReadingDate = bgReadingDate, bgReadingDate > Date().addingTimeInterval(-ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes) {
                 switch slopeOrdinal {
                 case 7:
                     return "\u{2193}\u{2193}" // ↓↓

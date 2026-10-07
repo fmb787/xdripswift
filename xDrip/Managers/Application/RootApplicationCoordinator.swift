@@ -2672,9 +2672,9 @@ import AppIntents
                 }
                 
                 let resolvedTherapyMetrics = therapyMetrics ?? TherapyMetricsManager.shared.snapshot()
-                // show the live activity if we're in master mode or (follower with a heartbeat) and only if the user has requested to show it
+                // show the live activity (in master mode or follower mode with any keep-alive type) only if the user has requested to show it
                 // if we should show it, then let's continue processing the lastReading array to create a valid contentState
-                if (UserDefaults.standard.isMaster || (!UserDefaults.standard.isMaster && UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat)) && UserDefaults.standard.liveActivityType != .disabled {
+                if LiveActivityManager.isAllowedInCurrentMode && UserDefaults.standard.liveActivityType != .disabled {
                     // create the contentState that will update the dynamic attributes of the Live Activity Widget
                     var contentState = XDripWidgetAttributes.ContentState( bgReadingValues: bgReadingValues, bgReadingDates: bgReadingDates, isMgDl: UserDefaults.standard.bloodGlucoseUnitIsMgDl, slopeOrdinal: slopeOrdinal, deltaValueInUserUnit: deltaValueInUserUnit, urgentLowLimitInMgDl: UserDefaults.standard.urgentLowMarkValue, lowLimitInMgDl: UserDefaults.standard.lowMarkValue, highLimitInMgDl: UserDefaults.standard.highMarkValue, urgentHighLimitInMgDl: UserDefaults.standard.urgentHighMarkValue, liveActivityType: UserDefaults.standard.liveActivityType, carPlayLiveActivityType: UserDefaults.standard.carPlayLiveActivityType, dataSourceDescription: dataSourceDescription, followerPatientName: !UserDefaults.standard.isMaster ? UserDefaults.standard.followerPatientName : nil, sensorNoiseStateRawValue: sensorNoiseStateRawValue, aidStatus: aidStatus, therapyMetrics: resolvedTherapyMetrics)
                     

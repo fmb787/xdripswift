@@ -70,6 +70,16 @@ public final class LiveActivityManager: ObservableObject {
 // MARK: - Helper Extension
 
 extension LiveActivityManager {
+    /// Live Activities are available in every mode: master, or follower with any keep-alive type (not only heartbeat).
+    ///
+    /// This is safe because the Live Activity never keeps showing an old glucose value: the activity is created/updated with a
+    /// `staleDate` (see `XDripWidgetAttributes.ContentState.staleDate`), so once the latest reading is older than
+    /// `ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes` (20 minutes) the glucose value, trend arrow and delta are
+    /// replaced by "---" even if the app is suspended and cannot send a new update.
+    ///
+    /// Keep every "is the Live Activity allowed" decision on this one property, so that a future restriction needs one change.
+    static var isAllowedInCurrentMode: Bool { true }
+
     /// Uses the most recent real state for the Settings preview once glucose limits are available.
     var contentStateForPreview: XDripWidgetAttributes.ContentState? {
         persistentContentState.urgentLowLimitInMgDl > 0 ? persistentContentState : nil
@@ -179,7 +189,7 @@ extension LiveActivityManager {
     /// Public API: Restart from intent/shortcut
     @MainActor
     func restartFromIntent() {
-        if (UserDefaults.standard.isMaster || (!UserDefaults.standard.isMaster && UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat)) && UserDefaults.standard.liveActivityType != .disabled {
+        if LiveActivityManager.isAllowedInCurrentMode && UserDefaults.standard.liveActivityType != .disabled {
             if persistentContentState.urgentLowLimitInMgDl > 0 {
                 trace("in restartFromIntent, will try and end/restart current Live Activity", log: log, category: ConstantsLog.categoryLiveActivityManager, type: .info)
                 Task { @MainActor [weak self] in
@@ -194,7 +204,7 @@ extension LiveActivityManager {
                 trace("in restartFromIntent, cannot restart live activity from Intent because there is no persistentContentState available", log: log, category: ConstantsLog.categoryLiveActivityManager, type: .info)
             }
         } else {
-            trace("in restartFromIntent, will NOT try and restart Live Activity as not in master or not follower+heartbeat or LAs are not enabled", log: log, category: ConstantsLog.categoryLiveActivityManager, type: .info)}
+            trace("in restartFromIntent, will NOT try and restart Live Activity as Live Activities are not allowed in the current mode or are not enabled", log: log, category: ConstantsLog.categoryLiveActivityManager, type: .info)}
     }
 
     /// Recover orphaned activities if needed. This likely won't usually be needed often but if we can do it, then we will avoid
@@ -300,7 +310,8 @@ extension LiveActivityManager {
         updatedContentState.warnUserToOpenApp = false
         updatedContentState.eventStartDate = eventStartDate
         
-        let content = ActivityContent(state: updatedContentState, staleDate: nil, relevanceScore: 1.0)
+        // the stale date makes iOS redraw the activity (with isStale = true) when the latest reading becomes too old, even if the app is suspended
+        let content = ActivityContent(state: updatedContentState, staleDate: updatedContentState.staleDate, relevanceScore: 1.0)
         
         do {
             eventActivity = try Activity.request(
@@ -357,7 +368,7 @@ extension LiveActivityManager {
             // update the persistent content state with the new/updated content state
             persistentContentState = updatedContentState
             
-            await eventActivity?.update(ActivityContent(state: updatedContentState, staleDate: nil))
+            await eventActivity?.update(ActivityContent(state: updatedContentState, staleDate: updatedContentState.staleDate))
             trace("in updateActivity, live activity updated", log: log, category: ConstantsLog.categoryLiveActivityManager, type: .debug, troubleshooting: .detailed(.integration(name: .liveActivity, activity: .succeeded(itemCount: nil))))
         }
     }

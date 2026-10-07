@@ -19,7 +19,7 @@ struct XDripWidgetLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     if !context.state.showsSensorWarmupStatus {
-                        Text("\(context.state.bgValueStringInUserChosenUnit())\(context.state.trendArrow())")
+                        Text("\(context.displayState.bgValueStringInUserChosenUnit())\(context.displayState.trendArrow())")
                             .font(.largeTitle).bold()
                             .foregroundStyle(context.state.bgTextColor())
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -32,7 +32,7 @@ struct XDripWidgetLiveActivity: Widget {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             if let deviceStatusIconImage = context.state.deviceStatusIconImage(), let deviceStatusColor = context.state.deviceStatusColor() {
                                 HStack(alignment: .center, spacing: 10) {
-                                    Text(context.state.deltaChangeStringInUserChosenUnit())
+                                    Text(context.displayState.deltaChangeStringInUserChosenUnit())
                                         .font(.title).fontWeight(.semibold)
                                         .foregroundStyle(context.state.deltaChangeTextColor())
                                         .minimumScaleFactor(0.2)
@@ -43,7 +43,7 @@ struct XDripWidgetLiveActivity: Widget {
                                 }
                             } else {
                                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                    Text(context.state.deltaChangeStringInUserChosenUnit())
+                                    Text(context.displayState.deltaChangeStringInUserChosenUnit())
                                         .font(.title).fontWeight(.semibold)
                                         .foregroundStyle(context.state.deltaChangeTextColor())
                                 
@@ -72,7 +72,7 @@ struct XDripWidgetLiveActivity: Widget {
                         .foregroundStyle(.orange)
                         .accessibilityLabel(context.state.isWaitingForSensorReading ? Texts_Common.sensorWaitingForReading : Texts_Common.sensorWarmingUp)
                 } else {
-                    Text("\(context.state.bgValueStringInUserChosenUnit())\(context.state.trendArrow())")
+                    Text("\(context.displayState.bgValueStringInUserChosenUnit())\(context.displayState.trendArrow())")
                         .foregroundStyle(context.state.bgTextColor())
                         .minimumScaleFactor(0.2)
                 }
@@ -94,7 +94,7 @@ struct XDripWidgetLiveActivity: Widget {
                         .foregroundStyle(deviceStatusColor)
                         .minimumScaleFactor(0.2)
                 } else {
-                    Text(context.state.deltaChangeStringInUserChosenUnit())
+                    Text(context.displayState.deltaChangeStringInUserChosenUnit())
                         .foregroundStyle(context.state.deltaChangeTextColor())
                         .minimumScaleFactor(0.2)
                 }
@@ -104,7 +104,7 @@ struct XDripWidgetLiveActivity: Widget {
                         .foregroundStyle(.orange)
                         .accessibilityLabel(context.state.isWaitingForSensorReading ? Texts_Common.sensorWaitingForReading : Texts_Common.sensorWarmingUp)
                 } else {
-                    Text("\(context.state.bgValueStringInUserChosenUnit())")
+                    Text("\(context.displayState.bgValueStringInUserChosenUnit())")
                         .foregroundStyle(context.state.bgTextColor())
                         .minimumScaleFactor(0.2)
                 }

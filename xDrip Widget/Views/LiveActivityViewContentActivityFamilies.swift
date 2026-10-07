@@ -17,7 +17,7 @@ struct LiveActivityViewContentActivityFamilies: View {
 
     var body: some View {
         LiveActivityViewContentActivityFamiliesState(
-            state: context.state
+            state: context.displayState
         )
     }
 }

@@ -9,12 +9,25 @@
 import SwiftUI
 import WidgetKit
 
+extension ActivityViewContext where Attributes == XDripWidgetAttributes {
+    /// The content state to draw. When iOS reports the Live Activity as stale (the `staleDate` set in LiveActivityManager has
+    /// passed, i.e. the latest reading is older than `ConstantsWidgetExtension.bgReadingDateVeryStaleInMinutes`) the state is marked
+    /// as stale, so the glucose value, trend arrow and delta are replaced by "---". This works even if the app is suspended and
+    /// cannot send an update. Always draw glucose values from this property, never directly from `state`.
+    var displayState: XDripWidgetAttributes.ContentState {
+        guard isStale else { return state }
+        var staleState = state
+        staleState.isMarkedStale = true
+        return staleState
+    }
+}
+
 // Standard Lock Screen Live Activity view.
 struct LiveActivityViewContent: View {
     @State var context: ActivityViewContext<XDripWidgetAttributes>
 
     var body: some View {
-        LiveActivityViewContentState(state: context.state)
+        LiveActivityViewContentState(state: context.displayState)
     }
 }
 

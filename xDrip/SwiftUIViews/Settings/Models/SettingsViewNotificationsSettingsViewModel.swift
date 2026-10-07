@@ -109,7 +109,7 @@ class SettingsViewNotificationsSettingsViewModel: NSObject, SettingsViewModelPro
                 sectionID: sectionID,
                 isVisible: liveActivitiesAvailable
             )
-            if UserDefaults.standard.isMaster || UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat {
+            if liveActivitiesAvailable {
                 let liveActivityTypes = LiveActivityType.allCasesForList
                 liveActivityTypeRow.accessory = .none
                 liveActivityTypeRow.control = .menu(
@@ -237,9 +237,9 @@ class SettingsViewNotificationsSettingsViewModel: NSObject, SettingsViewModelPro
             return SettingsSelectedRowAction.askText(title: Texts_SettingsView.settingsviews_IntervalTitle, message: Texts_SettingsView.settingsviews_IntervalMessage, keyboardType: .numberPad, text: UserDefaults.standard.notificationInterval.description, placeHolder: "0", fieldTitle: Texts_Common.enterValue, unitText: Texts_Common.minutes, actionTitle: nil, cancelTitle: nil, actionHandler: {(interval:String) in if let interval = Int(interval) {UserDefaults.standard.notificationInterval = Int(interval)}}, cancelHandler: nil, inputValidator: nil)
             
         case .liveActivityType:
-            // live activities can only be used in master mode as follower mode
-            // will not allow updates whilst the app is in the background
-            if UserDefaults.standard.isMaster || UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat {
+            // live activities can be used in master mode and in follower mode (any keep-alive type)
+            // when the app can't update in the background, the glucose value is hidden after 20 minutes (see LiveActivityManager.isAllowedInCurrentMode)
+            if liveActivitiesAvailable {
                 
                 // data to be displayed in list from which user needs to pick a live activity type
                 var data = [String]()
@@ -347,7 +347,7 @@ class SettingsViewNotificationsSettingsViewModel: NSObject, SettingsViewModelPro
             return .disclosure
             
         case .liveActivityType:
-            return UserDefaults.standard.isMaster || UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat ? .disclosure : .none
+            return liveActivitiesAvailable ? .disclosure : .none
         }
     }
     
@@ -363,7 +363,7 @@ class SettingsViewNotificationsSettingsViewModel: NSObject, SettingsViewModelPro
             return UserDefaults.standard.notificationInterval.description + " " + Texts_Common.minutes
             
         case .liveActivityType:
-            return UserDefaults.standard.isMaster || UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat ? UserDefaults.standard.liveActivityType.description : Texts_SettingsView.liveActivityDisabledInFollowerMode
+            return liveActivitiesAvailable ? UserDefaults.standard.liveActivityType.description : Texts_SettingsView.liveActivityDisabledInFollowerMode
         }
     }
 
@@ -422,7 +422,7 @@ class SettingsViewNotificationsSettingsViewModel: NSObject, SettingsViewModelPro
     }
 
     private var liveActivitiesAvailable: Bool {
-        UserDefaults.standard.isMaster || UserDefaults.standard.followerBackgroundKeepAliveType == .heartbeat
+        LiveActivityManager.isAllowedInCurrentMode
     }
 
     private var carPlaySettingsVisible: Bool {
