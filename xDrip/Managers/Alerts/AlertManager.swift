@@ -292,7 +292,7 @@ public class AlertManager: NSObject {
 
         if alertType.overridemute {
             guard soundFileName != "" else { return }
-            soundPlayer?.playSound(soundFileName: soundFileName ?? "xdripalert.aif")
+            soundPlayer?.playSound(soundFileName: soundFileName ?? "xdripalert.aif", raiseVolumeToAtLeast: AlertTypeVolumeBoost.isEnabled(alertTypeName: alertType.name) ? AlertTypeVolumeBoost.volume : nil)
         } else if let soundFileName {
             guard !soundFileName.isEmpty else { return }
             content.sound = UNNotificationSound(named: UNNotificationSoundName(soundFileName))
@@ -1038,7 +1038,7 @@ public class AlertManager: NSObject {
                     if applicableAlertType.overridemute && delayInSecondsToUse == 0 {
                         // play the sound
                         if let soundPlayer = soundPlayer {
-                            soundPlayer.playSound(soundFileName: soundToSet)
+                            soundPlayer.playSound(soundFileName: soundToSet, raiseVolumeToAtLeast: AlertTypeVolumeBoost.isEnabled(alertTypeName: applicableAlertType.name) ? AlertTypeVolumeBoost.volume : nil)
                         }
                     } else {
                         // mute should not be overriden, by adding the sound to the notification, we let iOS decide if the sound will be played or not

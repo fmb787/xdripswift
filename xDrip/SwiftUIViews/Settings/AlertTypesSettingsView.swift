@@ -76,6 +76,7 @@ enum AlertTypeEditorSetting: Int, CaseIterable {
     case vibrate
     case soundName
     case overrideMute
+    case raiseVolume
     case snoozeViaNotification
     case defaultSnoozePeriod
 }
@@ -85,6 +86,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
     @Published var enabled = ConstantsDefaultAlertTypeSettings.enabled
     @Published var name = ConstantsDefaultAlertTypeSettings.name
     @Published var overrideMute = ConstantsDefaultAlertTypeSettings.overrideMute
+    @Published var raiseVolume = false
     @Published var snooze = ConstantsDefaultAlertTypeSettings.snooze
     @Published var snoozePeriod = ConstantsDefaultAlertTypeSettings.snoozePeriod
     @Published var vibrate = ConstantsDefaultAlertTypeSettings.vibrate
@@ -116,6 +118,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
             enabled = alertType.enabled
             name = alertType.name
             overrideMute = alertType.overridemute
+            raiseVolume = AlertTypeVolumeBoost.isEnabled(alertTypeName: alertType.name)
             snooze = alertType.snooze
             snoozePeriod = alertType.snoozeperiod
             vibrate = alertType.vibrate
@@ -125,7 +128,9 @@ final class AlertTypeEditorViewModel: ObservableObject {
 
     /// Hides advanced rows when the alert type is disabled.
     var rows: [AlertTypeEditorSetting] {
-        enabled ? AlertTypeEditorSetting.allCases : [.enabled, .name]
+        guard enabled else { return [.enabled, .name] }
+        // raising the volume only works together with override mute, because only then the app plays the sound itself
+        return AlertTypeEditorSetting.allCases.filter { $0 != .raiseVolume || overrideMute }
     }
 
     /// Alert types that are still used by alarms cannot be deleted.
@@ -154,6 +159,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
         }
 
         if let alertType {
+            AlertTypeVolumeBoost.rename(from: alertType.name, to: name)
             alertType.name = name
             alertType.enabled = enabled
             alertType.overridemute = overrideMute
@@ -175,6 +181,8 @@ final class AlertTypeEditorViewModel: ObservableObject {
             )
         }
 
+        AlertTypeVolumeBoost.set(overrideMute && raiseVolume, alertTypeName: name)
+
         coreDataManager.saveChanges()
         close()
     }
@@ -192,6 +200,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
             action: { [weak self] in
                 guard let self else { return }
 
+                AlertTypeVolumeBoost.set(false, alertTypeName: alertType.name)
                 self.coreDataManager.mainManagedObjectContext.delete(alertType)
                 self.coreDataManager.saveChanges()
                 self.close()
@@ -225,7 +234,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
         case .soundName:
             showSoundSelection()
 
-        case .enabled, .vibrate, .overrideMute, .snoozeViaNotification, .defaultSnoozePeriod:
+        case .enabled, .vibrate, .overrideMute, .raiseVolume, .snoozeViaNotification, .defaultSnoozePeriod:
             break
         }
     }
@@ -244,6 +253,8 @@ final class AlertTypeEditorViewModel: ObservableObject {
             return Texts_AlertTypeSettingsView.alertTypeSound
         case .overrideMute:
             return Texts_AlertTypeSettingsView.alertTypeOverrideMute
+        case .raiseVolume:
+            return Texts_AlertTypeSettingsView.alertTypeRaiseVolume
         case .snoozeViaNotification:
             return Texts_AlertTypeSettingsView.alertTypeSnoozeViaNotification
         case .defaultSnoozePeriod:
@@ -267,7 +278,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
             return Texts_AlertTypeSettingsView.alertTypeDefaultIOSSound
         case .defaultSnoozePeriod:
             return snoozePeriodLabel
-        case .vibrate, .overrideMute, .snoozeViaNotification:
+        case .vibrate, .overrideMute, .raiseVolume, .snoozeViaNotification:
             return nil
         }
     }
@@ -450,6 +461,12 @@ struct AlertTypeEditorView: View {
 
         case .overrideMute:
             Toggle(isOn: $viewModel.overrideMute) {
+                SettingsRowTextView(title: viewModel.title(for: setting), detail: nil, isEnabled: true)
+            }
+            .tint(.green)
+
+        case .raiseVolume:
+            Toggle(isOn: $viewModel.raiseVolume) {
                 SettingsRowTextView(title: viewModel.title(for: setting), detail: nil, isEnabled: true)
             }
             .tint(.green)
