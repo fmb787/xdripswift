@@ -801,7 +801,13 @@ public class AlertManager: NSObject {
         // hardware life. G5/G6/ONE use the transmitter start date. G7/ONE+/Stelo use the sensor
         // start date. This gate affects only notification firing. The raw response remains available
         // to device details, Battery History, Loop metadata and Nightscout.
+        //
+        // FMB2: this gate must only apply to the Dexcom battery alerts. It used to be applied to EVERY alert kind, so with a
+        // leftover Dexcom battery value in the settings and no Dexcom peripheral configured (for example after switching to
+        // follower mode) the start date was nil, "nil" counts as "still settling", and high, low, urgent low/high, fast
+        // drop/rise and missed reading alerts were all silently suppressed.
         if alertNeeded,
+           alertKind == .dexcomG5BatteryLow || alertKind == .dexcomG7BatteryLow,
            let transmitterBatteryInfo = transmitterBatteryInfo,
            case .dexcom(let family, _, _, _, _, _) = transmitterBatteryInfo,
            DexcomBatteryAlertPolicy.shouldSuppress(
