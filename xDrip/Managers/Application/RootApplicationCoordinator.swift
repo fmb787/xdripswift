@@ -2123,7 +2123,9 @@ import AppIntents
         // unwrap alerts and check alerts
         if let alertManager = alertManager {
             // check if an immediate alert went off that shows the current reading
-            let immediateGlucoseNotificationCreated = alertManager.checkAlerts(maxAgeOfLastBgReadingInSeconds: ConstantsFollower.maximumBgReadingAgeForAlertsInSeconds)
+            // master readings arrive immediately from the transmitter, follower readings (e.g. CareLink) arrive with a delay, so use a larger maximum age in follower mode
+            let maximumReadingAge = UserDefaults.standard.isMaster ? ConstantsMaster.maximumBgReadingAgeForAlertsInSeconds : ConstantsFollower.maximumBgReadingAgeForAlertsInSeconds
+            let immediateGlucoseNotificationCreated = alertManager.checkAlerts(maxAgeOfLastBgReadingInSeconds: maximumReadingAge)
 
             // The shared alert pass removes old pending requests before rebuilding them. Check the
             // independent loop alert afterwards so its immediate notification cannot be removed by

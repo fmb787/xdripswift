@@ -7,7 +7,11 @@ enum ConstantsFollower {
     static let maxiumDaysOfReadingsToDownload = 1
     
     /// maximum age in seconds, of reading in alert flow. If age of latest reading is more than this number, then no alert check will be done
-    static let maximumBgReadingAgeForAlertsInSeconds = 240.0
+    ///
+    /// Raised from 240 to 600 seconds (FMB2 branch). With CareLink the reading reaches the app some time after it was measured
+    /// (pump upload + the ~5 minute poll), so the reading was often already older than 240 seconds when received
+    /// ("in checkAlerts, latestBgReadings is older than 240.0 seconds" in the trace) and then NO alert (high/low/fast drop/rise) was checked.
+    static let maximumBgReadingAgeForAlertsInSeconds = 600.0
     
     /// how often the followerConnectionTimer should run to check for the last connection timestamp and update the UI
     static let secondsUsedByFollowerConnectionTimer: Double = 5
