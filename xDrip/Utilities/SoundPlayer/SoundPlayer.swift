@@ -124,35 +124,65 @@ class SoundPlayer {
     
 }
 
-/// Stores per alert type name whether the system volume must be raised to 50% before the alert sound is played (only used if override mute is on).
+/// Stores per alert type name the volume (in percent) the system volume must be raised to before the alert sound is played (only used if override mute is on).
+/// No entry means the feature is off for that alert type.
 /// Kept in UserDefaults, not in Core Data, so no Core Data model migration is needed.
 enum AlertTypeVolumeBoost {
     
-    /// the volume that is set, if the system volume is lower
-    static let volume: Float = 0.5
+    static let defaultPercent = 50
+    static let minimumPercent = 10
+    static let maximumPercent = 100
     
-    private static let key = "alertTypeNamesWithRaiseVolumeTo50"
+    private static let key = "alertTypeVolumePercentByName"
     
-    private static var names: [String] {
-        get { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+    /// key used by the first version of this feature, which only supported 50%
+    private static let legacyKey = "alertTypeNamesWithRaiseVolumeTo50"
+    
+    private static var percents: [String: Int] {
+        get {
+            var result = UserDefaults.standard.dictionary(forKey: key) as? [String: Int] ?? [:]
+            // migrate the first version
+            if let legacyNames = UserDefaults.standard.stringArray(forKey: legacyKey) {
+                for name in legacyNames where result[name] == nil { result[name] = defaultPercent }
+                UserDefaults.standard.set(result, forKey: key)
+                UserDefaults.standard.removeObject(forKey: legacyKey)
+            }
+            return result
+        }
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }
     
     static func isEnabled(alertTypeName: String) -> Bool {
-        return names.contains(alertTypeName)
+        return percents[alertTypeName] != nil
     }
     
-    static func set(_ enabled: Bool, alertTypeName: String) {
-        var current = names.filter { $0 != alertTypeName }
-        if enabled { current.append(alertTypeName) }
-        names = current
+    /// the stored percentage, nil if the feature is off for this alert type
+    static func percent(alertTypeName: String) -> Int? {
+        return percents[alertTypeName]
+    }
+    
+    /// the volume (0.0 - 1.0) to raise to, nil if the feature is off for this alert type
+    static func volume(alertTypeName: String) -> Float? {
+        guard let percent = percents[alertTypeName] else { return nil }
+        return Float(min(max(percent, minimumPercent), maximumPercent)) / 100
+    }
+    
+    /// - parameter percent: nil switches the feature off
+    static func set(percent: Int?, alertTypeName: String) {
+        var current = percents
+        if let percent {
+            current[alertTypeName] = min(max(percent, minimumPercent), maximumPercent)
+        } else {
+            current.removeValue(forKey: alertTypeName)
+        }
+        percents = current
     }
     
     /// to be used when an alert type is renamed, so the setting follows the alert type
     static func rename(from oldName: String, to newName: String) {
-        guard oldName != newName, isEnabled(alertTypeName: oldName) else { return }
-        set(false, alertTypeName: oldName)
-        set(true, alertTypeName: newName)
+        guard oldName != newName, let percent = percent(alertTypeName: oldName) else { return }
+        set(percent: nil, alertTypeName: oldName)
+        set(percent: percent, alertTypeName: newName)
     }
     
 }

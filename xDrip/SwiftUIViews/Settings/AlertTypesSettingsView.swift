@@ -77,6 +77,7 @@ enum AlertTypeEditorSetting: Int, CaseIterable {
     case soundName
     case overrideMute
     case raiseVolume
+    case raiseVolumePercent
     case snoozeViaNotification
     case defaultSnoozePeriod
 }
@@ -87,6 +88,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
     @Published var name = ConstantsDefaultAlertTypeSettings.name
     @Published var overrideMute = ConstantsDefaultAlertTypeSettings.overrideMute
     @Published var raiseVolume = false
+    @Published var raiseVolumePercent = AlertTypeVolumeBoost.defaultPercent
     @Published var snooze = ConstantsDefaultAlertTypeSettings.snooze
     @Published var snoozePeriod = ConstantsDefaultAlertTypeSettings.snoozePeriod
     @Published var vibrate = ConstantsDefaultAlertTypeSettings.vibrate
@@ -118,7 +120,10 @@ final class AlertTypeEditorViewModel: ObservableObject {
             enabled = alertType.enabled
             name = alertType.name
             overrideMute = alertType.overridemute
-            raiseVolume = AlertTypeVolumeBoost.isEnabled(alertTypeName: alertType.name)
+            if let percent = AlertTypeVolumeBoost.percent(alertTypeName: alertType.name) {
+                raiseVolume = true
+                raiseVolumePercent = percent
+            }
             snooze = alertType.snooze
             snoozePeriod = alertType.snoozeperiod
             vibrate = alertType.vibrate
@@ -130,7 +135,13 @@ final class AlertTypeEditorViewModel: ObservableObject {
     var rows: [AlertTypeEditorSetting] {
         guard enabled else { return [.enabled, .name] }
         // raising the volume only works together with override mute, because only then the app plays the sound itself
-        return AlertTypeEditorSetting.allCases.filter { $0 != .raiseVolume || overrideMute }
+        return AlertTypeEditorSetting.allCases.filter {
+            switch $0 {
+            case .raiseVolume: return overrideMute
+            case .raiseVolumePercent: return overrideMute && raiseVolume
+            default: return true
+            }
+        }
     }
 
     /// Alert types that are still used by alarms cannot be deleted.
@@ -181,7 +192,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
             )
         }
 
-        AlertTypeVolumeBoost.set(overrideMute && raiseVolume, alertTypeName: name)
+        AlertTypeVolumeBoost.set(percent: overrideMute && raiseVolume ? raiseVolumePercent : nil, alertTypeName: name)
 
         coreDataManager.saveChanges()
         close()
@@ -200,7 +211,7 @@ final class AlertTypeEditorViewModel: ObservableObject {
             action: { [weak self] in
                 guard let self else { return }
 
-                AlertTypeVolumeBoost.set(false, alertTypeName: alertType.name)
+                AlertTypeVolumeBoost.set(percent: nil, alertTypeName: alertType.name)
                 self.coreDataManager.mainManagedObjectContext.delete(alertType)
                 self.coreDataManager.saveChanges()
                 self.close()
@@ -234,6 +245,32 @@ final class AlertTypeEditorViewModel: ObservableObject {
         case .soundName:
             showSoundSelection()
 
+        case .raiseVolumePercent:
+            textEntry = SettingsTextEntryContent(
+                title: Texts_AlertTypeSettingsView.alertTypeRaiseVolumePercent,
+                message: Texts_AlertTypeSettingsView.alertTypeRaiseVolumePercentMessage,
+                keyboardType: .numberPad,
+                text: String(raiseVolumePercent),
+                placeholder: nil,
+                fieldTitle: nil,
+                unitText: "%",
+                actionTitle: Texts_Common.Ok,
+                cancelTitle: Texts_Common.Cancel,
+                action: { [weak self] text in
+                    if let value = Int(text.trimmingCharacters(in: .whitespaces)) {
+                        self?.raiseVolumePercent = min(max(value, AlertTypeVolumeBoost.minimumPercent), AlertTypeVolumeBoost.maximumPercent)
+                    }
+                },
+                cancel: nil,
+                validator: { text in
+                    guard let value = Int(text.trimmingCharacters(in: .whitespaces)),
+                          (AlertTypeVolumeBoost.minimumPercent...AlertTypeVolumeBoost.maximumPercent).contains(value) else {
+                        return Texts_AlertTypeSettingsView.alertTypeRaiseVolumePercentMessage
+                    }
+                    return nil
+                }
+            )
+
         case .enabled, .vibrate, .overrideMute, .raiseVolume, .snoozeViaNotification, .defaultSnoozePeriod:
             break
         }
@@ -255,6 +292,8 @@ final class AlertTypeEditorViewModel: ObservableObject {
             return Texts_AlertTypeSettingsView.alertTypeOverrideMute
         case .raiseVolume:
             return Texts_AlertTypeSettingsView.alertTypeRaiseVolume
+        case .raiseVolumePercent:
+            return Texts_AlertTypeSettingsView.alertTypeRaiseVolumePercent
         case .snoozeViaNotification:
             return Texts_AlertTypeSettingsView.alertTypeSnoozeViaNotification
         case .defaultSnoozePeriod:
@@ -278,6 +317,8 @@ final class AlertTypeEditorViewModel: ObservableObject {
             return Texts_AlertTypeSettingsView.alertTypeDefaultIOSSound
         case .defaultSnoozePeriod:
             return snoozePeriodLabel
+        case .raiseVolumePercent:
+            return "\(raiseVolumePercent)%"
         case .vibrate, .overrideMute, .raiseVolume, .snoozeViaNotification:
             return nil
         }
@@ -505,7 +546,7 @@ struct AlertTypeEditorView: View {
             }
             .buttonStyle(.plain)
 
-        case .name, .soundName:
+        case .name, .soundName, .raiseVolumePercent:
             SettingsStaticRowView(
                 title: viewModel.title(for: setting),
                 detail: viewModel.detail(for: setting),

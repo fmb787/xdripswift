@@ -35,7 +35,15 @@ class Texts_AlertTypeSettingsView {
     }()
     
     static let alertTypeRaiseVolume: String = {
-        return NSLocalizedString("alerttypesettingsview_raisevolume", tableName: filename, bundle: Bundle.main, value: "Raise Volume to 50%", comment: "when editing an alert type, field title for raising the volume to 50% before the alert sound is played, only shown if Override Mute is on")
+        return NSLocalizedString("alerttypesettingsview_raisevolume", tableName: filename, bundle: Bundle.main, value: "Raise Volume", comment: "when editing an alert type, field title for raising the volume before the alert sound is played, only shown if Override Mute is on")
+    }()
+    
+    static let alertTypeRaiseVolumePercent: String = {
+        return NSLocalizedString("alerttypesettingsview_raisevolumepercent", tableName: filename, bundle: Bundle.main, value: "Volume Level", comment: "when editing an alert type, field title for the volume level (in percent) the volume is raised to, only shown if Raise Volume is on")
+    }()
+    
+    static let alertTypeRaiseVolumePercentMessage: String = {
+        return NSLocalizedString("alerttypesettingsview_raisevolumepercentmessage", tableName: filename, bundle: Bundle.main, value: "Enter a value between 10 and 100. A volume that is already higher is never lowered.", comment: "when editing an alert type, message when entering the volume level in percent")
     }()
     
     static let alertTypeOverrideMute: String = {
